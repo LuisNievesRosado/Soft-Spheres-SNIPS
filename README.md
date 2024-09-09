@@ -1,7 +1,7 @@
 # Soft-Spheres-SNIPS
 Code base for Soft Sphere SNIPS Project
 
-MC - Monte Carlo code
+MC - Monte Carlo code - Fortran based
 
 POST - Post processing code for MD simulations
 
