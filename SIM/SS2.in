@@ -1,0 +1,127 @@
+## LAMMPS Settings ##
+log SS.log
+units 			lj     
+atom_style		atomic     
+boundary p p f
+neigh_modify delay 0
+
+### Read Simulation Box and Atoms ###
+read_data SSout.data
+
+group 1 type 1 # ISV
+group 2 type 2 # SVPS
+
+
+### Simulation Variable Definitions ###
+variable T1 equal 0.05
+variable T2 equal 0.02
+
+variable wallM equal 20.0
+
+variable walli1 equal 0.2 # ISV
+variable walli2 equal 0.2 # SVPS
+
+
+variable wallr1 equal ramp(0.2,1.1) # ISV
+variable wallr2 equal ramp(0.2,0.0) # SVPS
+
+
+variable wallr1f equal 1.1 # ISV
+variable wallr2f equal 0.0 # SVPS
+
+variable Spos equal 0.5
+
+variable ltop equal zhi
+variable lbot equal zlo
+
+
+
+
+### Interaction information ###
+pair_style table linear 1000
+
+pair_coeff 1 1 YKI.pot YKI 2.25 # ISV - ISV
+pair_coeff 2 2 YKS.pot YKS 2.25 # SVPS - SVPS
+pair_coeff 1 2 YKIS.pot YKIS 2.25 # ISV - SVPS
+
+
+### Set dump and thermodynamic output ###
+
+
+compute T all temp
+
+compute g all rdf 100 * *
+fix g all ave/time 100 5 1000 c_g[*] file SS2.g mode vector
+
+thermo 1000
+thermo_style custom step vol pe ke etotal c_T press v_walli1 v_walli2
+
+### Change Box Size to Fit Walls ###
+change_box all z delta -3.0 3.0 units box
+
+### Set up initial walls ###
+fix wall1I 1 wall/harmonic zlo v_lbot ${walli1} 1.0 2.0 zhi v_ltop ${walli1} 1.0 2.0 #ISV
+fix wall2I 2 wall/harmonic zlo v_lbot ${walli2} 1.0 1.472 zhi v_ltop ${walli2} 1.0 1.472 #SVPS
+
+
+
+
+
+
+
+### Setup small walls
+fix wallS all wall/harmonic zlo v_lbot ${wallM} 1.0 ${Spos} zhi v_ltop ${wallM} 1.0 ${Spos}
+
+
+### Prepare for Langevin Dynamics ###
+
+velocity all create ${T1} 191 mom yes rot yes dist gaussian
+fix 1 all langevin ${T1} ${T2} $(100.0*dt) 562315 zero yes
+fix 2 all nve
+
+
+### Initial Relaxation Run ###
+timestep 0.01
+run 100000
+ 
+run 900000
+timestep 0.05
+dump 1 all atom 5000 SS2.lammpstrj
+thermo_style custom step vol pe ke etotal c_T press v_wallr1 v_wallr2 
+
+#### Unfix ###
+unfix wall1I
+unfix wall2I
+
+
+unfix 1
+#
+#### Set up run 1 walls ###
+fix wall1 1 wall/harmonic zlo v_lbot v_wallr1 1.0 2.0 zhi v_ltop v_wallr1 1.0 2.0 #ISV
+fix wall2 2 wall/harmonic zlo v_lbot v_wallr2 1.0 1.472 zhi v_ltop v_wallr2 1.0 1.472 #SVPS
+
+#### Prepare for Langevin Dynamics ###
+#
+fix 3 all langevin ${T2} ${T2} $(100.0*dt) 562315 zero yes
+
+run 1000000 
+#
+unfix wall1
+unfix wall2
+
+
+
+#### Set up run 2 walls ###
+fix wallf1 1 wall/harmonic zlo v_lbot v_wallr1f 1.0 2.0 zhi v_ltop v_wallr1f 1.0 2.0 #ISV
+fix wallf2 2 wall/harmonic zlo v_lbot v_wallr2f 1.0 1.472 zhi v_ltop v_wallr2f 1.0 1.472 #SVPS
+#
+thermo_style custom step vol pe ke etotal c_T press v_wallr1f v_wallr2f 
+run 500000 
+#
+
+
+
+
+
+
+
